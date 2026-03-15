@@ -1,0 +1,38 @@
+# Dataset (too large for GitHub)
+cell_images/
+
+# Trained models (use Git LFS or upload separately)
+models/
+
+# Results / outputs
+results/
+static/uploads/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.pyc
+
+# Virtual env
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Env file
+.env

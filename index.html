@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MalariaNet — AI Malaria Detection</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0a0e0d;--bg2:#0f1512;--surface:#1a2420;--surface2:#1f2d28;
+    --border:#2a3d36;--border2:#3a5548;
+    --accent:#00e87a;--accent2:#00c465;--accent-dim:rgba(0,232,122,0.10);
+    --red:#ff4d6d;--red-dim:rgba(255,77,109,0.10);
+    --amber:#f59e0b;--amber-dim:rgba(245,158,11,0.10);
+    --text:#e8f0ec;--text2:#8fa899;--text3:#4d6b5e;
+    --mono:'DM Mono',monospace;--display:'Syne',sans-serif;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh}
+  body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.025) 2px,rgba(0,0,0,0.025) 4px);pointer-events:none;z-index:9999}
+
+  /* NAV */
+  nav{display:flex;align-items:center;justify-content:space-between;padding:14px 32px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(10,14,13,0.93);backdrop-filter:blur(14px);z-index:100}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-mark{width:30px;height:30px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center}
+  .logo-mark svg{width:16px;height:16px}
+  .logo-name{font-family:var(--display);font-size:17px;font-weight:800;letter-spacing:-.5px}
+  .logo-name span{color:var(--accent)}
+  .nav-pill{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:6px;letter-spacing:.06em;text-transform:uppercase}
+  .pulse{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* MAIN LAYOUT */
+  .container{max-width:1100px;margin:0 auto;padding:40px 24px}
+  .page-title{font-family:var(--display);font-size:28px;font-weight:800;letter-spacing:-1px;margin-bottom:6px}
+  .page-sub{font-size:13px;color:var(--text3);margin-bottom:32px}
+
+  /* GRID */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+  .card-header{padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:space-between;border-radius:var(--radius) var(--radius) 0 0}
+  .card-title{font-size:12px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;font-weight:500}
+  .card-body{padding:24px}
+
+  /* UPLOAD */
+  .drop-zone{border:2px dashed var(--border2);border-radius:8px;padding:36px 20px;text-align:center;cursor:pointer;transition:all .25s;background:var(--bg2);position:relative;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+  .drop-zone:hover,.drop-zone.over{border-color:var(--accent);background:var(--accent-dim)}
+  .drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0}
+  .dz-icon{width:52px;height:52px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center}
+  .dz-title{font-family:var(--display);font-size:15px;font-weight:600;color:var(--text)}
+  .dz-sub{font-size:12px;color:var(--text3);line-height:1.6}
+  .dz-types{display:flex;gap:6px}
+  .dz-type{font-size:10px;padding:3px 8px;border-radius:3px;background:var(--surface2);color:var(--text3);border:1px solid var(--border);letter-spacing:.06em}
+
+  /* PREVIEW */
+  .preview-area{min-height:180px;display:flex;align-items:center;justify-content:center;padding:16px}
+  #preview-img{max-width:100%;max-height:200px;border-radius:6px;display:none;object-fit:contain}
+  .preview-empty{text-align:center;color:var(--text3);font-size:12px}
+  .preview-empty div:first-child{font-size:28px;margin-bottom:8px;opacity:.25}
+
+  /* MODEL SELECT */
+  .model-select-row{display:flex;gap:10px;margin-top:14px}
+  .model-btn{flex:1;font-family:var(--mono);font-size:12px;padding:10px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:6px;cursor:pointer;transition:all .2s;letter-spacing:.02em}
+  .model-btn.active{background:var(--accent-dim);color:var(--accent);border-color:var(--accent)}
+  .model-btn:hover:not(.active){border-color:var(--border2);color:var(--text)}
+
+  /* ANALYZE BTN */
+  #analyze-btn{width:100%;margin-top:14px;padding:14px;font-family:var(--display);font-size:15px;font-weight:700;background:var(--accent);color:#000;border:none;border-radius:8px;cursor:pointer;transition:all .25s;display:flex;align-items:center;justify-content:center;gap:10px;position:relative;overflow:hidden;letter-spacing:.01em}
+  #analyze-btn:disabled{opacity:.35;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+  #analyze-btn:not(:disabled):hover{background:var(--accent2);transform:translateY(-1px);box-shadow:0 8px 28px rgba(0,232,122,.28)}
+  #analyze-btn.loading::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);animation:shimmer 1.2s infinite}
+  @keyframes shimmer{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
+  /* RESULTS */
+  .result-wrapper{grid-column:1/-1;display:none}
+  .result-wrapper.show{display:block}
+
+  .result-banner{display:flex;align-items:center;gap:18px;padding:20px 24px;border-radius:var(--radius) var(--radius) 0 0}
+  .result-banner.para{background:var(--red-dim);border:1px solid rgba(255,77,109,.3)}
+  .result-banner.uninf{background:var(--accent-dim);border:1px solid rgba(0,232,122,.25)}
+  .result-icon{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+  .result-icon.para{background:rgba(255,77,109,.2);border:1px solid var(--red)}
+  .result-icon.uninf{background:rgba(0,232,122,.2);border:1px solid var(--accent)}
+  .result-label{font-family:var(--display);font-size:24px;font-weight:800}
+  .result-label.para{color:var(--red)}
+  .result-label.uninf{color:var(--accent)}
+  .result-sub{font-size:12px;color:var(--text2);margin-top:3px}
+  .result-conf{margin-left:auto;text-align:right}
+  .result-conf-val{font-family:var(--display);font-size:32px;font-weight:800}
+  .result-conf-lbl{font-size:11px;color:var(--text3);margin-top:2px;letter-spacing:.06em;text-transform:uppercase}
+
+  .result-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:20px 24px;background:var(--surface);border-left:1px solid rgba(255,77,109,.2);border-right:1px solid rgba(255,77,109,.2)}
+  .result-metrics.uninf{border-left-color:rgba(0,232,122,.2);border-right-color:rgba(0,232,122,.2)}
+  .metric-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px}
+  .metric-box-lbl{font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+  .metric-box-val{font-family:var(--display);font-size:22px;font-weight:700}
+  .metric-bar{height:4px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden}
+  .metric-fill{height:100%;border-radius:2px;transition:width 1s ease}
+
+  /* GAUGE */
+  .gauge-wrap{padding:16px 24px;background:var(--surface);border-left:1px solid var(--border);border-right:1px solid var(--border)}
+  .gauge-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:12px}
+  .gauge-lbl{color:var(--text3);letter-spacing:.06em;text-transform:uppercase;font-size:11px}
+  .gauge-num{font-family:var(--display);font-size:17px;font-weight:700}
+  .gauge-bar{height:7px;background:var(--border);border-radius:4px;overflow:hidden}
+  .gauge-fill{height:100%;border-radius:4px;transition:width 1.1s cubic-bezier(.4,0,.2,1)}
+  .gauge-scale{display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:5px}
+
+  /* RECOMMENDATION */
+  .rec-box{padding:16px 24px;background:var(--surface);border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius)}
+  .rec-lbl{font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+  .rec-text{font-size:13px;color:var(--text2);line-height:1.8}
+
+  /* DISCLAIMER */
+  .disclaimer{margin-top:12px;padding:12px 16px;background:var(--amber-dim);border:1px solid rgba(245,158,11,.2);border-radius:6px;font-size:11px;color:var(--amber);display:flex;gap:8px;line-height:1.7}
+
+  /* HISTORY */
+  .history-section{margin-top:36px}
+  .history-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .history-title{font-family:var(--display);font-size:16px;font-weight:600}
+  .clear-btn{font-family:var(--mono);font-size:11px;padding:5px 12px;background:transparent;color:var(--text3);border:1px solid var(--border);border-radius:4px;cursor:pointer;transition:all .2s}
+  .clear-btn:hover{color:var(--red);border-color:var(--red)}
+  .history-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{background:var(--surface2);padding:11px 16px;text-align:left;font-size:10px;font-weight:500;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--border)}
+  td{padding:11px 16px;border-bottom:1px solid var(--border);color:var(--text2)}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:var(--surface2)}
+  .empty-td{text-align:center;color:var(--text3);padding:28px!important}
+
+  /* SPINNER */
+  .spinner{width:14px;height:14px;border:2px solid rgba(0,0,0,.3);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* STATUS BADGE */
+  .badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:3px;letter-spacing:.06em;text-transform:uppercase}
+  .badge-para{background:var(--red-dim);color:var(--red);border:1px solid rgba(255,77,109,.3)}
+  .badge-uninf{background:var(--accent-dim);color:var(--accent);border:1px solid rgba(0,232,122,.25)}
+
+  /* API STATUS */
+  .api-status{padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text3);margin-bottom:20px;display:flex;align-items:center;gap:10px}
+  .api-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .api-dot.ok{background:var(--accent)}
+  .api-dot.warn{background:var(--amber)}
+  .api-dot.err{background:var(--red)}
+
+  @media(max-width:760px){
+    .grid{grid-template-columns:1fr}
+    .result-metrics{grid-template-columns:1fr 1fr}
+    nav{padding:12px 16px}
+    .container{padding:24px 14px}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24" fill="none">
+        <circle cx="11" cy="11" r="7" stroke="#000" stroke-width="2"/>
+        <circle cx="9.5" cy="9.5" r="2" fill="#000"/>
+        <path d="M16 16L20 20" stroke="#000" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <span class="logo-name">Malaria<span>Net</span></span>
+  </div>
+  <div class="nav-pill"><span class="pulse"></span> CNN Model — MobileNetV2</div>
+</nav>
+
+<div class="container">
+
+  <div class="page-title">Cell Image Detector</div>
+  <div class="page-sub">Upload a microscopic blood smear image — the CNN model will classify it as Parasitized or Uninfected</div>
+
+  <!-- API / Model status -->
+  <div class="api-status" id="model-status">
+    <span class="api-dot warn" id="status-dot"></span>
+    <span id="status-text">Checking model availability...</span>
+  </div>
+
+  <div class="grid">
+
+    <!-- Upload -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Upload Cell Image</span>
+        <span id="fname" style="font-size:11px;color:var(--text3)">No file</span>
+      </div>
+      <div class="card-body">
+        <div class="drop-zone" id="drop-zone">
+          <input type="file" id="file-input" accept="image/*">
+          <div class="dz-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8fa899" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </div>
+          <div class="dz-title">Drop image here</div>
+          <div class="dz-sub">or click to browse your files</div>
+          <div class="dz-types">
+            <span class="dz-type">PNG</span>
+            <span class="dz-type">JPG</span>
+            <span class="dz-type">BMP</span>
+          </div>
+        </div>
+
+        <div style="margin-top:14px;font-size:11px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">Select Model</div>
+        <div class="model-select-row">
+          <button class="model-btn active" id="btn-mobile" onclick="selectModel('MobileNetV2')">MobileNetV2</button>
+          <button class="model-btn" id="btn-effnet" onclick="selectModel('EfficientNetB0')">EfficientNetB0</button>
+        </div>
+
+        <button id="analyze-btn" disabled onclick="runAnalysis()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Run CNN Inference
+        </button>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Image Preview</span>
+        <span id="img-size" style="font-size:11px;color:var(--text3)"></span>
+      </div>
+      <div class="preview-area">
+        <div class="preview-empty" id="preview-empty">
+          <div>🔬</div>
+          <div>Upload an image to preview</div>
+        </div>
+        <img id="preview-img" alt="Cell preview">
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="result-wrapper" id="result-wrapper">
+      <div id="result-inner"></div>
+      <div class="disclaimer">
+        <span>⚠</span>
+        <span>For educational and research purposes only. Not a certified medical device. Always consult a qualified clinician for diagnosis.</span>
+      </div>
+    </div>
+
+  </div><!-- /grid -->
+
+  <!-- History -->
+  <div class="history-section">
+    <div class="history-header">
+      <div class="history-title">Session History</div>
+      <button class="clear-btn" onclick="clearHistory()">Clear</button>
+    </div>
+    <div class="history-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Filename</th><th>Model</th><th>Result</th>
+            <th>Confidence</th><th>Parasite Prob.</th><th>Inference</th><th>Time</th>
+          </tr>
+        </thead>
+        <tbody id="history-body">
+          <tr><td class="empty-td" colspan="8">No analyses yet — upload a cell image to begin</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+  let selectedModel = 'MobileNetV2';
+  let history = [];
+  let currentFile = null;
+
+  // ── Check model availability ──
+  async function checkModels() {
+    try {
+      const r = await fetch('/api/models');
+      const d = await r.json();
+      const dot  = document.getElementById('status-dot');
+      const text = document.getElementById('status-text');
+      if (d.available_models && d.available_models.length > 0) {
+        dot.className  = 'api-dot ok';
+        text.textContent = `Models ready: ${d.available_models.join(', ')}`;
+      } else {
+        dot.className  = 'api-dot warn';
+        text.textContent = 'No trained models found — run: python train.py';
+      }
+    } catch(e) {
+      document.getElementById('status-dot').className = 'api-dot err';
+      document.getElementById('status-text').textContent = 'Server error — is Flask running?';
+    }
+  }
+  checkModels();
+
+  // ── Drag & drop ──
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('over');
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('image/')) setFile(f);
+  });
+  document.getElementById('file-input').addEventListener('change', e => {
+    if (e.target.files[0]) setFile(e.target.files[0]);
+  });
+
+  function setFile(file) {
+    currentFile = file;
+    document.getElementById('fname').textContent = file.name;
+    document.getElementById('img-size').textContent = (file.size / 1024).toFixed(1) + ' KB';
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.getElementById('preview-img');
+      img.src = e.target.result;
+      img.style.display = 'block';
+      document.getElementById('preview-empty').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+    document.getElementById('analyze-btn').disabled = false;
+    document.getElementById('result-wrapper').classList.remove('show');
+  }
+
+  function selectModel(name) {
+    selectedModel = name;
+    document.getElementById('btn-mobile').classList.toggle('active', name === 'MobileNetV2');
+    document.getElementById('btn-effnet').classList.toggle('active', name === 'EfficientNetB0');
+  }
+
+  // ── Analysis ──
+  async function runAnalysis() {
+    if (!currentFile) return;
+    const btn = document.getElementById('analyze-btn');
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.innerHTML = '<div class="spinner"></div> Running inference...';
+
+    const fd = new FormData();
+    fd.append('file', currentFile);
+    fd.append('model', selectedModel);
+
+    try {
+      const resp = await fetch('/api/predict', { method: 'POST', body: fd });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        alert(data.error || 'Prediction failed');
+        return;
+      }
+
+      renderResult(data);
+      addHistory(data);
+      checkModels();
+    } catch(e) {
+      alert('Request failed: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Run CNN Inference';
+    }
+  }
+
+  function renderResult(d) {
+    const isPara = d.prediction === 'Parasitized';
+    const cls    = isPara ? 'para' : 'uninf';
+    const color  = isPara ? 'var(--red)' : 'var(--accent)';
+    const conf   = Math.round(d.confidence * 100);
+    const pProb  = Math.round(d.parasite_prob * 100);
+    const uProb  = Math.round(d.uninfected_prob * 100);
+
+    document.getElementById('result-inner').innerHTML = `
+      <div class="result-banner ${cls}">
+        <div class="result-icon ${cls}">${isPara ? '⚠' : '✓'}</div>
+        <div>
+          <div class="result-label ${cls}">${d.prediction}</div>
+          <div class="result-sub">${isPara
+            ? 'Plasmodium parasite detected — recommend clinical confirmation'
+            : 'No parasite detected — cell appears healthy'}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:6px">Model: ${d.model} &nbsp;·&nbsp; Inference: ${d.inference_ms}ms</div>
+        </div>
+        <div class="result-conf">
+          <div class="result-conf-val" style="color:${color}">${conf}%</div>
+          <div class="result-conf-lbl">Confidence</div>
+        </div>
+      </div>
+      <div class="result-metrics ${cls}">
+        <div class="metric-box">
+          <div class="metric-box-lbl">Parasite Prob.</div>
+          <div class="metric-box-val" style="color:var(--red)">${pProb}%</div>
+          <div class="metric-bar"><div class="metric-fill" style="width:0%;background:var(--red)" data-w="${pProb}"></div></div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-box-lbl">Uninfected Prob.</div>
+          <div class="metric-box-val" style="color:var(--accent)">${uProb}%</div>
+          <div class="metric-bar"><div class="metric-fill" style="width:0%;background:var(--accent)" data-w="${uProb}"></div></div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-box-lbl">Confidence</div>
+          <div class="metric-box-val" style="color:${color}">${conf}%</div>
+          <div class="metric-bar"><div class="metric-fill" style="width:0%;background:${color}" data-w="${conf}"></div></div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-box-lbl">Inference Time</div>
+          <div class="metric-box-val" style="color:var(--amber)">${d.inference_ms}ms</div>
+          <div class="metric-bar"><div class="metric-fill" style="width:0%;background:var(--amber)" data-w="${Math.min(100, d.inference_ms / 50)}"></div></div>
+        </div>
+      </div>
+      <div class="gauge-wrap">
+        <div class="gauge-header">
+          <span class="gauge-lbl">Model Confidence Score</span>
+          <span class="gauge-num" style="color:${color}">${conf}%</span>
+        </div>
+        <div class="gauge-bar"><div class="gauge-fill" id="g-fill" style="width:0%;background:${color}"></div></div>
+        <div class="gauge-scale"><span>50% — uncertain</span><span>100% — very high</span></div>
+      </div>
+      <div class="rec-box">
+        <div class="rec-lbl">Clinical Recommendation</div>
+        <div class="rec-text">${isPara
+          ? `<strong style="color:var(--red)">Action required:</strong> Parasitized cells detected with ${conf}% confidence. This result should be confirmed by a qualified medical professional using thick/thin blood smear microscopy before initiating treatment. Probability of infection: ${pProb}%.`
+          : `<strong style="color:var(--accent)">No infection detected:</strong> Cell classified as uninfected with ${conf}% confidence (${uProb}% probability). Continue monitoring if symptoms persist and consult a clinician for comprehensive diagnosis.`
+        }</div>
+      </div>
+    `;
+
+    const wrapper = document.getElementById('result-wrapper');
+    wrapper.classList.add('show');
+    wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    setTimeout(() => {
+      document.querySelectorAll('.metric-fill, #g-fill').forEach(el => {
+        const w = el.id === 'g-fill' ? conf : el.dataset.w;
+        el.style.width = w + '%';
+      });
+    }, 80);
+  }
+
+  function addHistory(d) {
+    history.unshift({ n: history.length + 1, ...d, fname: currentFile.name });
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const tbody = document.getElementById('history-body');
+    if (!history.length) {
+      tbody.innerHTML = '<tr><td class="empty-td" colspan="8">No analyses yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = history.map(h => {
+      const isPara = h.prediction === 'Parasitized';
+      return `<tr>
+        <td style="color:var(--text3)">${h.n}</td>
+        <td style="color:var(--text);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.fname}</td>
+        <td style="color:var(--text3)">${h.model}</td>
+        <td><span class="badge ${isPara ? 'badge-para' : 'badge-uninf'}">${h.prediction}</span></td>
+        <td style="color:${isPara ? 'var(--red)' : 'var(--accent)'};font-weight:500">${Math.round(h.confidence * 100)}%</td>
+        <td style="color:var(--text3)">${Math.round(h.parasite_prob * 100)}%</td>
+        <td style="color:var(--text3)">${h.inference_ms}ms</td>
+        <td style="color:var(--text3)">${new Date(h.timestamp).toLocaleTimeString()}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function clearHistory() { history = []; renderHistory(); }
+</script>
+</body>
+</html>
